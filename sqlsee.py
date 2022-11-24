@@ -1,6 +1,7 @@
 #!/bin/python3
 import argparse
 import urllib.request
+import urllib.parse
 import gzip
 
 ###### HTTP request ######
@@ -8,18 +9,16 @@ import gzip
 class HTTPrequest():
     """ Sends HTTP request and retrieves response. """
 
-    def __init__(self, url, header, path=None, data=None):
+    def __init__(self, url, header, data=None):
         self.url = url
-        self.path = urllib.request.pathname2url(path)
-        print(self.path)
-        self.url = self.url + self.path
         self.header = self._format_header(header)
         self.data = data
         self.response = None
 
 
-    def send_request(self):
+    def send_request(self, evil_url):
         """ Send HTTP request and decompress response if gzip compressed. """
+        self.evil_url = urllib.parse.quote_plus(evil_url)
         self.request = urllib.request.Request(self.url, self.data, self.header)
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
@@ -43,34 +42,27 @@ class HTTPrequest():
         return self.header_dict
 
 
-###### Iterator ######
-
-class Iterator(HTTPrequest):
-
-    def __init__(self, url, header, path=None, data=None, first_escape="", query="", last_escape=""):
-        super().__init__(url, header, path, data)
-        self.query = query
-        self.first_escape = first_escape
-        self.last_escape = last_escape
-
-    def iterate_columns(self):
-        self.delim = ", "
-        self.column = ""
-        for i in range(1, 20):
-            self.column += str(i) + self.delim
-            self.new_url = self.url + urllib.request.pathname2url(self.first_escape + self.query + self.column + self.last_escape)
-            self.send_request()
-
 
 ###### Injection base class ######
 
-class BaseInjection(Iterator):
+class BaseInjection(HTTPrequest):
 
-    def __init__(self):
+    def __init__(self, url, header, data=None):
+        super().__init__(url, header, data)
+
+    def get_version(self):
         pass
 
+    def get_column_num(self):
+        pass
 
-    def find_columns(self):
+    def get_databases(self):
+        pass
+
+    def get_table_names(self):
+        pass
+
+    def get_table_columns(self):
         pass
 
 
@@ -81,7 +73,12 @@ class MySQLunion(BaseInjection):
     def __init__(self):
         pass
 
+###### mariaDB ######
 
+class MariaDB(BaseInjection):
+
+    def __init__(self, url, header, data=None):
+        super().__init__(url, header, data)
 
 
 ###### Command line parser ######
@@ -89,14 +86,14 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("url", help="url of target in format http://x.x.x.x:port/path")
 parser.add_argument("-H", "--header", help="Header values in comma seperated list. See README for formatting. ex. Host: x.x.x.x, Accept: text/html")
-parser.add_argument("-fE", "--firstesc", help="First escape character used in query. ex. -fE '")
-parser.add_argument("-lE", "--lastesc", help="Last escape character used in query, usually a comment. ex. -- -")
-parser.add_argument("-p", "--path", help="url path if any. ex. -p /path/to/file.ex")
+
 
 ###### Main function ######
 def main():
     args = parser.parse_args()
-    it = Iterator(args.url, args.header, path=args.path, first_escape=args.firstesc, query=" UNION SELECT ", last_escape=args.lastesc)
-    it.iterate_columns()
+    test_obj = MariaDB(url=args.url, header=args.header)
+    test_obj.send_request(args.url)
+    print(test_obj.get_response())
+
 if __name__ == "__main__":
     main()
