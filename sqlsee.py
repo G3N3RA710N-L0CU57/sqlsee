@@ -3,6 +3,8 @@ import argparse
 import urllib.request
 import urllib.parse
 import gzip
+import configuration as config
+import time
 
 ###### HTTP request ######
 
@@ -16,10 +18,16 @@ class HTTPrequest():
         self.response = None
 
 
-    def send_request(self, evil_url):
+    def send_request(self, payload):
         """ Send HTTP request and decompress response if gzip compressed. """
-        self.evil_url = urllib.parse.quote_plus(evil_url)
-        self.request = urllib.request.Request(self.url, self.data, self.header)
+        self.payload = urllib.parse.quote(payload)
+        self.parts = urllib.parse.urlparse(payload)
+        self.query = self.parts[4]
+        self.query = urllib.parse.quote(self.query)
+        self.parts._replace(query=self.query)
+        self.payload = self.parts.geturl()
+        #self.payload = payload
+        self.request = urllib.request.Request(self.payload, self.data, self.header)
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
             # Check if gzip compressed.
@@ -56,6 +64,15 @@ class BaseInjection(HTTPrequest):
     def get_column_num(self):
         pass
 
+    def get_database_num(self, query):
+        for i in range(0, 20):
+            self.payload = self.url + query
+            time_start = time.time()
+            self.send_request(self.payload.format(i))
+            time_finish = time.time()
+            total_time = time_finish - time_start
+            print(total_time)
+
     def get_databases(self):
         pass
 
@@ -80,6 +97,8 @@ class MariaDB(BaseInjection):
     def __init__(self, url, header, data=None):
         super().__init__(url, header, data)
 
+    def get_database_num(self):
+        super().get_database_num(config.MariaDB.DATABASE_NUM.value)
 
 ###### Command line parser ######
 parser = argparse.ArgumentParser()
@@ -92,8 +111,7 @@ parser.add_argument("-H", "--header", help="Header values in comma seperated lis
 def main():
     args = parser.parse_args()
     test_obj = MariaDB(url=args.url, header=args.header)
-    test_obj.send_request(args.url)
-    print(test_obj.get_response())
+    test_obj.get_database_num()
 
 if __name__ == "__main__":
     main()
