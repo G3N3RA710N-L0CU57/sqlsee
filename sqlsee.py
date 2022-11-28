@@ -20,13 +20,7 @@ class HTTPrequest():
 
     def send_request(self, payload):
         """ Send HTTP request and decompress response if gzip compressed. """
-        self.payload = urllib.parse.quote(payload)
-        self.parts = urllib.parse.urlparse(payload)
-        self.query = self.parts[4]
-        self.query = urllib.parse.quote(self.query)
-        self.parts._replace(query=self.query)
-        self.payload = self.parts.geturl()
-        #self.payload = payload
+        self.payload = self._encode_url(payload)
         self.request = urllib.request.Request(self.payload, self.data, self.header)
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
@@ -49,7 +43,20 @@ class HTTPrequest():
 
         return self.header_dict
 
-
+    def _encode_url(self, payload):
+        """ Encode url """
+        self.payload_parts = urllib.parse.urlparse(payload)
+        self.path = self.payload_parts.path
+        self.params = self.payload_parts.params
+        self.query = self.payload_parts.query
+        self.path_encoded = urllib.parse.quote(self.path)
+        self.params_encoded = urllib.parse.quote(self.params)
+        self.query_encoded = urllib.parse.quote(self.query)
+        self.payload_encoded = self.payload_parts._replace(path=self.path_encoded)
+        self.payload_encoded = self.payload_parts._replace(params=self.params_encoded)
+        self.payload_encoded = self.payload_parts._replace(query=self.query_encoded)
+        print(self.payload_encoded.geturl())
+        return self.payload_encoded.geturl()
 
 ###### Injection base class ######
 
@@ -65,7 +72,7 @@ class BaseInjection(HTTPrequest):
         pass
 
     def get_database_num(self, query):
-        for i in range(0, 20):
+        for i in range(0, 50):
             self.payload = self.url + query
             time_start = time.time()
             self.send_request(self.payload.format(i))
