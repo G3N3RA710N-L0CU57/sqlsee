@@ -15,14 +15,15 @@ class HTTPrequest():
         self.url = url
         self.header = self._format_header(header)
         self.data = data
+        self.request = None
         self.response = None
-
+        self.payload = None
+        self.payload_parts = None
 
     def send_request(self, payload):
         """ Send HTTP request and decompress response if gzip compressed. """
         self.payload = self._encode_url(payload)
-        self.request = urllib.request.Request(self.payload, self.data, self.header)
-        self.response = None
+        self._create_request()
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
             # Check if gzip compressed.
@@ -34,6 +35,10 @@ class HTTPrequest():
     def get_response(self):
         """ Return HTTP response. """
         return self.response
+
+    def _create_request(self):
+        """ Create a request object  """
+        self.request = urllib.request.Request(self.payload, self.data, self.header)
 
     def _format_header(self, header):
         """ Format list of headers input from cli and return a dict.  """
@@ -48,17 +53,30 @@ class HTTPrequest():
 
     def _encode_url(self, payload):
         """ Encode url """
-        self.payload_parts = urllib.parse.urlparse(payload)
+        self.payload_parts = self._parse_url(payload)
+        self.payload_parts = self._url_encode_path()
+        self.payload_parts = self._url_encode_params()
+        self.payload_parts = self._url_encode_query()
+        return self.payload_parts.geturl()
+
+    def _parse_url(self, payload):
+        """ Returns a named tuple of url split into parts.  """
+        return urllib.parse.urlparse(payload)
+
+    def _url_encode_path(self):
+        """ Encode the path of a url.  """
         self.path = self.payload_parts.path
+        return self.payload_parts._replace(path=urllib.parse.quote(self.path))
+
+    def _url_encode_params(self):
+        """ Encode the parameters of a url.  """
         self.params = self.payload_parts.params
+        return self.payload_parts._replace(params=urllib.parse.quote(self.params))
+
+    def _url_encode_query(self):
+        """ Encode the query/queries of a url.  """
         self.query = self.payload_parts.query
-        self.path_encoded = urllib.parse.quote(self.path)
-        self.params_encoded = urllib.parse.quote(self.params)
-        self.query_encoded = urllib.parse.quote(self.query, safe='&=,')
-        self.payload_encoded = self.payload_parts._replace(path=self.path_encoded)
-        self.payload_encoded = self.payload_parts._replace(params=self.params_encoded)
-        self.payload_encoded = self.payload_parts._replace(query=self.query_encoded)
-        return self.payload_encoded.geturl()
+        return self.payload_parts._replace(query=urllib.parse.quote(self.query, safe='&=,'))
 
 ###### Injection base class ######
 
