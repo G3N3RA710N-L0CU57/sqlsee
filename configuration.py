@@ -15,6 +15,8 @@ class Characters(Enum):
 
     ALL_CHARS = LOWER_LETTER + UPPER_LETTER + DIGITS + CHARS
 
+    INSENSITIVE_CHARS = LOWER_LETTER + DIGITS + CHARS
+
 class MariaDB(Enum):
     """ Queries for MariaDB """
 
