@@ -49,38 +49,40 @@ class HTTPUrlEncode():
     def __init__(self, url, data=None):
         # Named tuple of url split into parts.
         self.url = urllib.parse.urlparse(url)
+        print(self.url)
         self.data = data
 
     def encode(self):
         """ Return an encoded url. """
         self._url_encode_path()
         self._url_encode_params()
-        self.url_encode_query()
+        self._url_encode_query()
         return self.url.geturl()
 
     def _url_encode_path(self):
         """ Encode the path of a url.  """
         self.path = self.url.path
-        return self.url._replace(path=urllib.parse.quote(self.path))
+        self.url = self.url._replace(path=urllib.parse.quote(self.path))
 
     def _url_encode_params(self):
         """ Encode the parameters of a url.  """
         self.params = self.url.params
-        return self.url._replace(params=urllib.parse.quote(self.params))
+        self.url = self.url._replace(params=urllib.parse.quote(self.params))
 
     def _url_encode_query(self):
         """ Encode the query/queries of a url.  """
         self.query = self.url.query
-        return self.url._replace(query=urllib.parse.quote(self.query, safe='&='))
+        self.url = self.url._replace(query=urllib.parse.quote(self.query, safe='&='))
 
 class HTTPTimedRequest(HTTPrequest):
     """ Timed request for time-based injection attack. """
-    def __init__(self, url, header, data):
+    def __init__(self, url, header, data=None):
         super().__init__(url, header, data)
         self.time_taken = 0
 
     def send_request(self):
         """ return the time taken for the request """
+        print('Sending timed request ...')
         self.start = time.time()
         self.response = super().send_request()
         self.finish = time.time()
@@ -92,42 +94,42 @@ class HTTPTimedRequest(HTTPrequest):
 
 class MariaDBdatabase():
     """ Class that finds the number of databases and names of each database.  """
-    def __init__(self, url, header, data=None):
+    def __init__(self, url, header, attack, data=None):
         self.database_num = 0
-        self.database = Tuple()
+        self.database = tuple()
         self.url = url
         self.header = header
         self.data = data
         # max num of databases to search.
-        MAX_RANGE = 50
+        self.MAX_RANGE = 50
+        self.attack = attack
+        print(self.attack)
 
-    def search_database(self):
+    def search_database_names(self):
         self._search_num_database()
         self._search_database_name()
 
     def get_database(self):
-        """ Returns tuple of database name, with first index being number of databases. """
+        """ Returns tuple of database names, with first index being number of databases. """
         return self.database
 
     def _search_num_database(self):
         """ Finds number of databases """
         # database query
         self.query = config.MariaDB.DATABASE_NUM.value
-        for i in range(0, MAX_RANGE + 1):
-            if(TIME):
+        self.url = self.url + self.query
+        for i in range(0, self.MAX_RANGE + 1):
+            if(self.attack == "TIME"):
+                self.time = HTTPTimedRequest(self.url.format(i), self.header, self.data).send_request()
+                print(self.time)
+            elif(self.attack == "ERROR"):
                 pass
-            elif(ERROR):
-                pass
-            elif(BOOLEAN):
+            elif(self.attack == "BOOLEAN"):
                 pass
             else:
                 pass
 
     def _search_database_name(self):
-        pass
-
-
-    def _time_request(self):
         pass
 
 
@@ -147,7 +149,6 @@ class MariaDB():
         self.header = header
         self.data = data
         self.attack = self._attack(time, error, boolean)
-
     def _attack(self, time, error, boolean):
         """ Define type of attack """
         if(time):
@@ -160,7 +161,7 @@ class MariaDB():
             print("Unsupported attack type")
 
     def attack_database(self):
-        print('Database attacked!')
+        database_names = MariaDBdatabase(self.url,self.header,self.attack, self.data).search_database_names()
 
 ###### Main object builder ######
 class Factory():
