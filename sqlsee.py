@@ -130,8 +130,10 @@ class MariaDBdatabase():
                 print('Unsupported attack type.')
 
     def _search_database_name(self):
+        """ Iterates through known characters to find database names. """
         self.char_set = self._search_character_set()
-
+        self.database_names = [''] * self.database_num
+        self.found_char = True
 
     def _search_character_set(self):
         """ Enumerates database names for chars used. """
