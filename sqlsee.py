@@ -103,6 +103,7 @@ class MariaDBdatabase():
         self.attack = attack
 
     def search_database_names(self):
+        """ Public method to start database count and name enumeration. """
         self._search_num_database()
         self._search_database_name()
 
@@ -132,8 +133,8 @@ class MariaDBdatabase():
     def _search_database_name(self):
         """ Iterates through known characters to find database names. """
         self.char_set = self._search_character_set()
-        self.database_names = [''] * self.database_num
-        self.found_char = True
+        self.name_generator = NameGenerator(self.char_set)
+        print(self.name_generator.get_name())
 
     def _search_character_set(self):
         """ Enumerates database names for chars used. """
@@ -189,6 +190,31 @@ class MariaDB():
     def attack_database(self):
         if(VERBOSE): print('mariaDB database {} attack initiated ...'.format(self.attack))
         database_names = MariaDBdatabase(self.url,self.header,self.attack, self.data).search_database_names()
+
+
+class NameGenerator():
+    """ Class that creates a generator and returns names lazily. """
+    def __init__(self, char_set):
+        self.char_set = char_set # Possible characters found.
+        self.MAX_NAME_SIZE = 64
+        self.name = [''] * self.MAX_NAME_SIZE
+        self.gen_obj = self.generator(1, self.name)
+
+    def generator(self, n, name):
+        """ Generator that recursively creates possible names. """
+        for ch in self.char_set:
+            name[n-1] = ch
+            if(n == self.MAX_NAME_SIZE):
+                yield name
+            else:
+                yield from self.generator(n+1, name)
+
+    def get_name(self):
+        """ Returns a name from generator lazily. """
+        return next(self.gen_obj)
+
+
+
 
 ###### Main object builder ######
 class Factory():
